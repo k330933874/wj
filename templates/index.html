@@ -1,0 +1,392 @@
+<!-- templates/index.html 前端页面 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python文件管理系统</title>
+    <!-- 使用 Bootstrap 5 快速构建美观界面 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome 6 图标库 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .container-fluid { margin-top: 20px; margin-bottom: 20px; }
+        .breadcrumb-container { background: white; padding: 12px 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .table-container { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .file-row { cursor: pointer; transition: background 0.1s ease; }
+        .file-row:hover { background-color: #f1f3f5; }
+        .btn-sm-action { padding: 2px 8px; margin: 0 4px; }
+        .toolbar { margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+        .current-root-badge { font-size: 0.85rem; background: #e9ecef; padding: 6px 12px; border-radius: 30px; }
+        i.icon-folder { color: #ffc107; }
+        i.icon-file { color: #6c757d; }
+        i.icon-parent { color: #17a2b8; }
+        td { vertical-align: middle; }
+        .loading { text-align: center; padding: 40px; }
+    </style>
+</head>
+<body>
+<div class="container-fluid">
+    <h2 class="mb-3"><i class="fas fa-folder-open me-2"></i>Windows文件管理系统</h2>
+    <div class="current-root-badge d-inline-block mb-3">
+        <i class="fas fa-database"></i> 管理根目录: <strong>{{ root_name }}</strong> (所有操作限定于此)
+    </div>
+
+    <!-- 工具栏 -->
+    <div class="toolbar">
+        <button class="btn btn-primary" id="btn-upload"><i class="fas fa-upload"></i> 上传文件</button>
+        <button class="btn btn-outline-success" id="btn-new-folder"><i class="fas fa-folder-plus"></i> 新建文件夹</button>
+        <button class="btn btn-outline-secondary" id="btn-refresh"><i class="fas fa-sync-alt"></i> 刷新</button>
+        <span class="ms-auto text-muted" id="current-location"><i class="fas fa-location-dot"></i> 当前位置: /</span>
+    </div>
+
+    <!-- 面包屑导航 -->
+    <div class="breadcrumb-container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0" id="breadcrumb">
+                <li class="breadcrumb-item active">根目录</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- 文件列表表格 -->
+    <div class="table-container">
+        <table class="table table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 45%">名称</th>
+                    <th style="width: 15%">大小</th>
+                    <th style="width: 25%">修改时间</th>
+                    <th style="width: 15%">操作</th>
+                </tr>
+            </thead>
+            <tbody id="file-list-body">
+                <tr class="loading-row"><td colspan="4" class="loading">加载中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 上传文件模态框 -->
+<div class="modal fade" id="uploadModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-cloud-upload-alt"></i> 上传文件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label">选择文件（单个）</label>
+                        <input type="file" class="form-control" id="upload-file" name="file" required>
+                    </div>
+                    <input type="hidden" id="upload-path" name="path">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirm-upload">上传</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新建文件夹模态框 -->
+<div class="modal fade" id="mkdirModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-folder-plus"></i> 新建文件夹</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">文件夹名称</label>
+                <input type="text" class="form-control" id="new-folder-name" placeholder="请输入文件夹名">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirm-mkdir">创建</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 重命名模态框（动态填充内容） -->
+<div class="modal fade" id="renameModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-pencil-alt"></i> 重命名</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <label class="form-label">新名称</label>
+                <input type="text" class="form-control" id="rename-new-name" placeholder="新名称">
+                <input type="hidden" id="rename-original-path">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirm-rename">确定</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // 全局状态：当前浏览的相对路径（空字符串代表根目录）
+    let currentPath = "";
+    const modalUpload = new bootstrap.Modal(document.getElementById('uploadModal'));
+    const modalMkdir = new bootstrap.Modal(document.getElementById('mkdirModal'));
+    const modalRename = new bootstrap.Modal(document.getElementById('renameModal'));
+
+    // 获取当前路径对应的API参数
+    function getListApiPath() {
+        return currentPath ? `?path=${encodeURIComponent(currentPath)}` : '';
+    }
+
+    // 刷新文件列表并重新渲染
+    function refreshFileList() {
+        const tbody = document.getElementById('file-list-body');
+        tbody.innerHTML = '<tr><td colspan="4" class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>';
+        fetch(`/api/list${getListApiPath()}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-danger text-center">错误: ${data.error}</td></tr>`;
+                    return;
+                }
+                renderFileList(data.items);
+                updateBreadcrumb(data.current_path, data.parent_path);
+                document.getElementById('current-location').innerHTML = `<i class="fas fa-location-dot"></i> 当前位置: /${data.current_path || ''}`;
+            })
+            .catch(err => {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-danger text-center">请求失败: ${err.message}</td></tr>`;
+            });
+    }
+
+    // 渲染表格
+    function renderFileList(items) {
+        const tbody = document.getElementById('file-list-body');
+        if (!items.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">此文件夹为空</td></tr>';
+            return;
+        }
+        let html = '';
+        items.forEach(item => {
+            const icon = item.type === 'dir' ? '<i class="fas fa-folder icon-folder fa-lg me-2"></i>' : '<i class="fas fa-file icon-file fa-lg me-2"></i>';
+            const rowClass = item.type === 'dir' ? 'file-row' : 'file-row';
+            const actionButtons = `
+                <button class="btn btn-sm btn-outline-secondary btn-sm-action rename-btn" data-path="${item.relative_path}" data-name="${item.name}" data-type="${item.type}"><i class="fas fa-edit"></i></button>
+                <button class="btn btn-sm btn-outline-danger btn-sm-action delete-btn" data-path="${item.relative_path}" data-name="${item.name}"><i class="fas fa-trash-alt"></i></button>
+            `;
+            html += `
+                <tr class="${rowClass}" data-path="${item.relative_path}" data-type="${item.type}">
+                    <td>${icon} <span>${escapeHtml(item.name)}</span></td>
+                    <td>${item.size}</td>
+                    <td>${item.modified}</td>
+                    <td>${actionButtons}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+
+        // 绑定行点击事件（目录进入，文件下载）
+        document.querySelectorAll('#file-list-body .file-row').forEach(row => {
+            const relPath = row.getAttribute('data-path');
+            const type = row.getAttribute('data-type');
+            row.addEventListener('click', (e) => {
+                // 防止点击操作按钮时触发行事件
+                if (e.target.closest('.rename-btn') || e.target.closest('.delete-btn')) return;
+                if (type === 'dir') {
+                    // 进入目录
+                    currentPath = relPath;
+                    refreshFileList();
+                } else {
+                    // 下载文件
+                    downloadFile(relPath);
+                }
+            });
+        });
+
+        // 绑定重命名按钮事件
+        document.querySelectorAll('.rename-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const path = btn.getAttribute('data-path');
+                const oldName = btn.getAttribute('data-name');
+                document.getElementById('rename-original-path').value = path;
+                document.getElementById('rename-new-name').value = oldName;
+                modalRename.show();
+            });
+        });
+
+        // 绑定删除按钮事件
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const path = btn.getAttribute('data-path');
+                const name = btn.getAttribute('data-name');
+                if (confirm(`确定要删除 "${name}" 吗？删除后无法恢复。`)) {
+                    deleteItem(path);
+                }
+            });
+        });
+    }
+
+    // 更新面包屑
+    function updateBreadcrumb(current, parentPath) {
+        const breadcrumb = document.getElementById('breadcrumb');
+        const parts = current ? current.split('/') : [];
+        let html = `<li class="breadcrumb-item"><a href="#" data-path="" class="breadcrumb-link">根目录</a></li>`;
+        let cumulative = '';
+        for (let i = 0; i < parts.length; i++) {
+            cumulative += (i === 0 ? parts[i] : '/' + parts[i]);
+            html += `<li class="breadcrumb-item"><a href="#" data-path="${cumulative}" class="breadcrumb-link">${escapeHtml(parts[i])}</a></li>`;
+        }
+        if (!current) {
+            html = `<li class="breadcrumb-item active">根目录</li>`;
+        } else {
+            html += `<li class="breadcrumb-item active">${escapeHtml(parts[parts.length-1])}</li>`;
+        }
+        breadcrumb.innerHTML = html;
+        // 绑定面包屑导航点击
+        document.querySelectorAll('.breadcrumb-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetPath = link.getAttribute('data-path');
+                currentPath = targetPath;
+                refreshFileList();
+            });
+        });
+    }
+
+    // 下载文件
+    function downloadFile(relPath) {
+        window.location.href = `/api/download?path=${encodeURIComponent(relPath)}`;
+    }
+
+    // 删除文件或目录
+    function deleteItem(relPath) {
+        fetch('/api/delete', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: relPath })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) alert(`删除失败: ${data.error}`);
+            else refreshFileList();
+        })
+        .catch(err => alert(`请求错误: ${err.message}`));
+    }
+
+    // 上传文件逻辑
+    document.getElementById('confirm-upload').addEventListener('click', () => {
+        const fileInput = document.getElementById('upload-file');
+        const file = fileInput.files[0];
+        if (!file) {
+            alert('请选择文件');
+            return;
+        }
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('path', currentPath);
+        fetch('/api/upload', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) alert(`上传失败: ${data.error}`);
+            else {
+                alert('上传成功');
+                modalUpload.hide();
+                fileInput.value = '';
+                refreshFileList();
+            }
+        })
+        .catch(err => alert(`上传错误: ${err.message}`));
+    });
+
+    document.getElementById('btn-upload').addEventListener('click', () => {
+        document.getElementById('upload-path').value = currentPath;
+        modalUpload.show();
+    });
+
+    // 新建文件夹
+    document.getElementById('confirm-mkdir').addEventListener('click', () => {
+        const newName = document.getElementById('new-folder-name').value.trim();
+        if (!newName) {
+            alert('请输入文件夹名称');
+            return;
+        }
+        fetch('/api/mkdir', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: currentPath, name: newName })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) alert(`创建失败: ${data.error}`);
+            else {
+                alert('创建成功');
+                modalMkdir.hide();
+                document.getElementById('new-folder-name').value = '';
+                refreshFileList();
+            }
+        })
+        .catch(err => alert(`请求错误: ${err.message}`));
+    });
+    document.getElementById('btn-new-folder').addEventListener('click', () => {
+        modalMkdir.show();
+    });
+
+    // 重命名确认
+    document.getElementById('confirm-rename').addEventListener('click', () => {
+        const originalPath = document.getElementById('rename-original-path').value;
+        const newName = document.getElementById('rename-new-name').value.trim();
+        if (!newName) {
+            alert('新名称不能为空');
+            return;
+        }
+        fetch('/api/rename', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: originalPath, new_name: newName })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) alert(`重命名失败: ${data.error}`);
+            else {
+                alert('重命名成功');
+                modalRename.hide();
+                refreshFileList();
+            }
+        })
+        .catch(err => alert(`错误: ${err.message}`));
+    });
+
+    document.getElementById('btn-refresh').addEventListener('click', () => {
+        refreshFileList();
+    });
+
+    // 辅助: 防止XSS
+    function escapeHtml(str) {
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
+            return c;
+        });
+    }
+
+    // 初始化
+    refreshFileList();
+</script>
+</body>
+</html>
