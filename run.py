@@ -5,18 +5,18 @@ from pathlib import Path
 from file import app, BUSINESS_ROOT, BUSINESS_ROOT_ENV
 
 # 运行配置（可被环境变量 HOST / PORT / FLASK_DEBUG 覆盖）
-DEFAULT_HOST = "127.0.0.1"
-DEFAULT_PORT = 5001
-DEFAULT_DEBUG = False
+# DEFAULT_HOST = "127.0.0.1"
+# DEFAULT_PORT = 5001
+# DEFAULT_DEBUG = False
+#
+# LOG_CONFIG = Path(__file__).parent / "log_config.json"
 
-LOG_CONFIG = Path(__file__).parent / "log_config.json"
 
-
-def get_run_config():
-    host = os.environ.get("HOST", DEFAULT_HOST)
-    port = int(os.environ.get("PORT", str(DEFAULT_PORT)))
-    debug = os.environ.get("FLASK_DEBUG", str(DEFAULT_DEBUG).lower()).lower() in ("1", "true", "yes")
-    return host, port, debug
+# def get_run_config():
+    # host = os.environ.get("HOST", DEFAULT_HOST)
+    # port = int(os.environ.get("PORT", str(DEFAULT_PORT)))
+    # debug = os.environ.get("FLASK_DEBUG", str(DEFAULT_DEBUG).lower()).lower() in ("1", "true", "yes")
+    # return host, port, debug
 
 
 def print_startup_info(host, port):
@@ -36,15 +36,15 @@ def print_startup_info(host, port):
 if __name__ == "__main__":
     import uvicorn
 
-    host, port, debug = get_run_config()
-    print_startup_info(host, port)
+    # host, port, debug = get_run_config()
+    # print_startup_info(host, port)
 
     # Flask 是 WSGI 应用：指向 file:app，并显式指定 interface="wsgi"
     uvicorn.run(
         "file:app",
-        host=host,
-        port=port,
+        host="127.0.0.1",
+        port=5001,
         interface="wsgi",
-        log_config=str(LOG_CONFIG),
-        reload=debug,
+        log_config="log_config.json",
+        reload=False,
     )
