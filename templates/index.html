@@ -1,13 +1,12 @@
-<!-- templates/index.html 前端页面 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Python文件管理系统</title>
-    <!-- 使用 Bootstrap 5 快速构建美观界面 -->
+    <title>Python文件管理系统 - 数据分离版</title>
+    <!-- Bootstrap 5 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome 6 图标库 -->
+    <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         body { background-color: #f8f9fa; }
@@ -21,16 +20,21 @@
         .current-root-badge { font-size: 0.85rem; background: #e9ecef; padding: 6px 12px; border-radius: 30px; }
         i.icon-folder { color: #ffc107; }
         i.icon-file { color: #6c757d; }
-        i.icon-parent { color: #17a2b8; }
-        td { vertical-align: middle; }
         .loading { text-align: center; padding: 40px; }
+        .auth-area { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+        .auth-badge { font-size: 0.85rem; padding: 6px 12px; border-radius: 30px; }
+        .auth-badge.logged-in { background: #d1e7dd; color: #0f5132; }
+        .auth-badge.logged-out { background: #fff3cd; color: #664d03; }
     </style>
 </head>
 <body>
 <div class="container-fluid">
-    <h2 class="mb-3"><i class="fas fa-folder-open me-2"></i>Windows文件管理系统</h2>
+    <h2 class="mb-3"><i class="fas fa-folder-open me-2"></i>文件管理系统（代码与数据分离）</h2>
+    <!-- 修改点：显示根目录名称和绝对路径 -->
     <div class="current-root-badge d-inline-block mb-3">
-        <i class="fas fa-database"></i> 管理根目录: <strong>{{ root_name }}</strong> (所有操作限定于此)
+        <i class="fas fa-database"></i> 业务数据根目录: <strong>{{ root_name }}</strong>
+        <span class="text-muted ms-2 small">(绝对路径: {{ root_path }})</span>
+        <br><small class="text-secondary">所有操作均限定在此目录内</small>
     </div>
 
     <!-- 工具栏 -->
@@ -38,7 +42,12 @@
         <button class="btn btn-primary" id="btn-upload"><i class="fas fa-upload"></i> 上传文件</button>
         <button class="btn btn-outline-success" id="btn-new-folder"><i class="fas fa-folder-plus"></i> 新建文件夹</button>
         <button class="btn btn-outline-secondary" id="btn-refresh"><i class="fas fa-sync-alt"></i> 刷新</button>
-        <span class="ms-auto text-muted" id="current-location"><i class="fas fa-location-dot"></i> 当前位置: /</span>
+        <span class="text-muted" id="current-location"><i class="fas fa-location-dot"></i> 当前位置: /</span>
+        <div class="auth-area">
+            <span class="auth-badge logged-out" id="auth-badge"><i class="fas fa-user-lock"></i> 未登录</span>
+            <button class="btn btn-sm btn-outline-primary" id="btn-login"><i class="fas fa-sign-in-alt"></i> 登录</button>
+            <button class="btn btn-sm btn-outline-secondary d-none" id="btn-logout"><i class="fas fa-sign-out-alt"></i> 退出</button>
+        </div>
     </div>
 
     <!-- 面包屑导航 -->
@@ -65,6 +74,34 @@
                 <tr class="loading-row"><td colspan="4" class="loading">加载中...</td></tr>
             </tbody>
         </table>
+    </div>
+</div>
+
+<!-- 登录模态框 -->
+<div class="modal fade" id="loginModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-sign-in-alt"></i> 登录</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">登录后才能上传文件，浏览和下载无需登录。</p>
+                <div class="mb-3">
+                    <label class="form-label">用户名</label>
+                    <input type="text" class="form-control" id="login-username" placeholder="请输入用户名" autocomplete="username">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">密码</label>
+                    <input type="password" class="form-control" id="login-password" placeholder="请输入密码" autocomplete="current-password">
+                </div>
+                <div class="text-danger small d-none" id="login-error"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirm-login">登录</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -113,7 +150,7 @@
     </div>
 </div>
 
-<!-- 重命名模态框（动态填充内容） -->
+<!-- 重命名模态框 -->
 <div class="modal fade" id="renameModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -136,18 +173,94 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    // 全局状态：当前浏览的相对路径（空字符串代表根目录）
     let currentPath = "";
+    let isLoggedIn = false;
     const modalUpload = new bootstrap.Modal(document.getElementById('uploadModal'));
     const modalMkdir = new bootstrap.Modal(document.getElementById('mkdirModal'));
     const modalRename = new bootstrap.Modal(document.getElementById('renameModal'));
+    const modalLogin = new bootstrap.Modal(document.getElementById('loginModal'));
 
-    // 获取当前路径对应的API参数
+    function updateAuthUI(loggedIn, username) {
+        isLoggedIn = loggedIn;
+        const badge = document.getElementById('auth-badge');
+        const btnLogin = document.getElementById('btn-login');
+        const btnLogout = document.getElementById('btn-logout');
+        const btnUpload = document.getElementById('btn-upload');
+
+        if (loggedIn) {
+            badge.className = 'auth-badge logged-in';
+            badge.innerHTML = `<i class="fas fa-user-check"></i> 已登录: ${escapeHtml(username || '')}`;
+            btnLogin.classList.add('d-none');
+            btnLogout.classList.remove('d-none');
+            btnUpload.disabled = false;
+            btnUpload.title = '';
+        } else {
+            badge.className = 'auth-badge logged-out';
+            badge.innerHTML = '<i class="fas fa-user-lock"></i> 未登录';
+            btnLogin.classList.remove('d-none');
+            btnLogout.classList.add('d-none');
+            btnUpload.title = '请先登录后再上传';
+        }
+    }
+
+    function checkAuthStatus() {
+        return fetch('/api/auth/status')
+            .then(res => res.json())
+            .then(data => {
+                updateAuthUI(data.logged_in, data.username);
+                return data;
+            })
+            .catch(() => updateAuthUI(false));
+    }
+
+    function showLoginModal(message) {
+        const errorEl = document.getElementById('login-error');
+        if (message) {
+            errorEl.textContent = message;
+            errorEl.classList.remove('d-none');
+        } else {
+            errorEl.textContent = '';
+            errorEl.classList.add('d-none');
+        }
+        modalLogin.show();
+    }
+
+    function login() {
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+        if (!username || !password) {
+            showLoginModal('请输入用户名和密码');
+            return;
+        }
+        fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+        })
+        .then(res => res.json().then(data => ({ ok: res.ok, data })))
+        .then(({ ok, data }) => {
+            if (!ok) {
+                showLoginModal(data.error || '登录失败');
+                return;
+            }
+            updateAuthUI(true, data.username);
+            modalLogin.hide();
+            document.getElementById('login-password').value = '';
+            document.getElementById('login-error').classList.add('d-none');
+        })
+        .catch(err => showLoginModal(`请求错误: ${err.message}`));
+    }
+
+    function logout() {
+        fetch('/api/logout', { method: 'POST' })
+            .then(() => updateAuthUI(false))
+            .catch(err => alert(`退出失败: ${err.message}`));
+    }
+
     function getListApiPath() {
         return currentPath ? `?path=${encodeURIComponent(currentPath)}` : '';
     }
 
-    // 刷新文件列表并重新渲染
     function refreshFileList() {
         const tbody = document.getElementById('file-list-body');
         tbody.innerHTML = '<tr><td colspan="4" class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>';
@@ -167,7 +280,6 @@
             });
     }
 
-    // 渲染表格
     function renderFileList(items) {
         const tbody = document.getElementById('file-list-body');
         if (!items.length) {
@@ -177,13 +289,12 @@
         let html = '';
         items.forEach(item => {
             const icon = item.type === 'dir' ? '<i class="fas fa-folder icon-folder fa-lg me-2"></i>' : '<i class="fas fa-file icon-file fa-lg me-2"></i>';
-            const rowClass = item.type === 'dir' ? 'file-row' : 'file-row';
             const actionButtons = `
                 <button class="btn btn-sm btn-outline-secondary btn-sm-action rename-btn" data-path="${item.relative_path}" data-name="${item.name}" data-type="${item.type}"><i class="fas fa-edit"></i></button>
                 <button class="btn btn-sm btn-outline-danger btn-sm-action delete-btn" data-path="${item.relative_path}" data-name="${item.name}"><i class="fas fa-trash-alt"></i></button>
             `;
             html += `
-                <tr class="${rowClass}" data-path="${item.relative_path}" data-type="${item.type}">
+                <tr class="file-row" data-path="${item.relative_path}" data-type="${item.type}">
                     <td>${icon} <span>${escapeHtml(item.name)}</span></td>
                     <td>${item.size}</td>
                     <td>${item.modified}</td>
@@ -193,25 +304,20 @@
         });
         tbody.innerHTML = html;
 
-        // 绑定行点击事件（目录进入，文件下载）
         document.querySelectorAll('#file-list-body .file-row').forEach(row => {
             const relPath = row.getAttribute('data-path');
             const type = row.getAttribute('data-type');
             row.addEventListener('click', (e) => {
-                // 防止点击操作按钮时触发行事件
                 if (e.target.closest('.rename-btn') || e.target.closest('.delete-btn')) return;
                 if (type === 'dir') {
-                    // 进入目录
                     currentPath = relPath;
                     refreshFileList();
                 } else {
-                    // 下载文件
                     downloadFile(relPath);
                 }
             });
         });
 
-        // 绑定重命名按钮事件
         document.querySelectorAll('.rename-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -223,7 +329,6 @@
             });
         });
 
-        // 绑定删除按钮事件
         document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -236,7 +341,6 @@
         });
     }
 
-    // 更新面包屑
     function updateBreadcrumb(current, parentPath) {
         const breadcrumb = document.getElementById('breadcrumb');
         const parts = current ? current.split('/') : [];
@@ -252,7 +356,6 @@
             html += `<li class="breadcrumb-item active">${escapeHtml(parts[parts.length-1])}</li>`;
         }
         breadcrumb.innerHTML = html;
-        // 绑定面包屑导航点击
         document.querySelectorAll('.breadcrumb-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -263,12 +366,10 @@
         });
     }
 
-    // 下载文件
     function downloadFile(relPath) {
         window.location.href = `/api/download?path=${encodeURIComponent(relPath)}`;
     }
 
-    // 删除文件或目录
     function deleteItem(relPath) {
         fetch('/api/delete', {
             method: 'DELETE',
@@ -283,7 +384,6 @@
         .catch(err => alert(`请求错误: ${err.message}`));
     }
 
-    // 上传文件逻辑
     document.getElementById('confirm-upload').addEventListener('click', () => {
         const fileInput = document.getElementById('upload-file');
         const file = fileInput.files[0];
@@ -298,8 +398,12 @@
             method: 'POST',
             body: formData
         })
-        .then(res => res.json())
-        .then(data => {
+        .then(res => res.json().then(data => ({ status: res.status, data })))
+        .then(({ status, data }) => {
+            if (status === 401) {
+                showLoginModal(data.error || '请先登录');
+                return;
+            }
             if (data.error) alert(`上传失败: ${data.error}`);
             else {
                 alert('上传成功');
@@ -312,11 +416,21 @@
     });
 
     document.getElementById('btn-upload').addEventListener('click', () => {
+        if (!isLoggedIn) {
+            showLoginModal('上传文件需要先登录');
+            return;
+        }
         document.getElementById('upload-path').value = currentPath;
         modalUpload.show();
     });
 
-    // 新建文件夹
+    document.getElementById('btn-login').addEventListener('click', () => showLoginModal());
+    document.getElementById('btn-logout').addEventListener('click', logout);
+    document.getElementById('confirm-login').addEventListener('click', login);
+    document.getElementById('login-password').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') login();
+    });
+
     document.getElementById('confirm-mkdir').addEventListener('click', () => {
         const newName = document.getElementById('new-folder-name').value.trim();
         if (!newName) {
@@ -340,11 +454,11 @@
         })
         .catch(err => alert(`请求错误: ${err.message}`));
     });
+
     document.getElementById('btn-new-folder').addEventListener('click', () => {
         modalMkdir.show();
     });
 
-    // 重命名确认
     document.getElementById('confirm-rename').addEventListener('click', () => {
         const originalPath = document.getElementById('rename-original-path').value;
         const newName = document.getElementById('rename-new-name').value.trim();
@@ -373,20 +487,16 @@
         refreshFileList();
     });
 
-    // 辅助: 防止XSS
     function escapeHtml(str) {
         return str.replace(/[&<>]/g, function(m) {
             if (m === '&') return '&amp;';
             if (m === '<') return '&lt;';
             if (m === '>') return '&gt;';
             return m;
-        }).replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function(c) {
-            return c;
         });
     }
 
-    // 初始化
-    refreshFileList();
+    checkAuthStatus().then(() => refreshFileList());
 </script>
 </body>
 </html>
