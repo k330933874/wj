@@ -9,6 +9,17 @@ class Config:
     # 会话密钥（生产环境请通过环境变量 SECRET_KEY 设置）
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
 
-    # 上传权限账号（生产环境请通过环境变量设置）
-    AUTH_USERNAME = os.environ.get("AUTH_USERNAME", "admin")
-    AUTH_PASSWORD = os.environ.get("AUTH_PASSWORD", "admin123")
+    # SQLite 数据库路径
+    DATABASE_PATH = os.environ.get(
+        "DATABASE_PATH",
+        str(Path(__file__).parent / "data" / "file_manager.db"),
+    )
+
+    # 公司首页展示信息（可通过环境变量覆盖）
+    COMPANY_NAME = os.environ.get("COMPANY_NAME", "67科技")
+    COMPANY_SLOGAN = os.environ.get("COMPANY_SLOGAN", "专注检测")
+    COMPANY_INTRO = os.environ.get(
+        "COMPANY_INTRO",
+        "67科技致力于为企业提供安全、高效、可追溯的文件归档与协作解决方案，"
+        "帮助组织规范资料管理流程，提升业务协同效率。",
+    )

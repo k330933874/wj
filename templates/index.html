@@ -3,109 +3,228 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Python文件管理系统 - 数据分离版</title>
-    <!-- Bootstrap 5 -->
+    <title>文件管理系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome 6 -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
-        body { background-color: #f8f9fa; }
-        .container-fluid { margin-top: 20px; margin-bottom: 20px; }
-        .breadcrumb-container { background: white; padding: 12px 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        .table-container { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .file-row { cursor: pointer; transition: background 0.1s ease; }
-        .file-row:hover { background-color: #f1f3f5; }
+        :root {
+            --sidebar-width: 260px;
+            --sidebar-bg: #1e293b;
+            --sidebar-hover: #334155;
+            --sidebar-active: #3b82f6;
+            --sidebar-text: #e2e8f0;
+            --sidebar-muted: #94a3b8;
+        }
+        body { background: #f1f5f9; margin: 0; min-height: 100vh; }
+        .app-shell { display: none; min-height: 100vh; }
+        .app-shell.visible { display: flex; }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            color: var(--sidebar-text);
+            display: flex;
+            flex-direction: column;
+            box-shadow: 4px 0 24px rgba(15, 23, 42, 0.12);
+        }
+        .sidebar-brand {
+            padding: 1.25rem 1.25rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .sidebar-brand h1 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin: 0;
+            color: #fff;
+        }
+        .sidebar-brand small {
+            color: var(--sidebar-muted);
+            font-size: 0.75rem;
+        }
+        .sidebar-user {
+            padding: 0.85rem 1.25rem;
+            font-size: 0.8rem;
+            color: var(--sidebar-muted);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .sidebar-user strong { color: #fff; display: block; margin-bottom: 2px; }
+        .sidebar-nav-title {
+            padding: 1rem 1.25rem 0.5rem;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--sidebar-muted);
+            font-weight: 600;
+        }
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 0.75rem 1rem;
+        }
+        .dir-menu { list-style: none; margin: 0; padding: 0; }
+        .dir-menu ul { list-style: none; margin: 0; padding: 0 0 0 0.75rem; }
+        .dir-menu-item { margin: 2px 0; }
+        .dir-menu-link {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.55rem 0.75rem;
+            border-radius: 8px;
+            color: var(--sidebar-text);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: background 0.15s, color 0.15s;
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+        }
+        .dir-menu-link:hover {
+            background: var(--sidebar-hover);
+            color: #fff;
+        }
+        .dir-menu-link.active {
+            background: var(--sidebar-active);
+            color: #fff;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+        }
+        .dir-menu-link i.fa-folder { color: #fbbf24; font-size: 0.95rem; }
+        .dir-menu-link.active i.fa-folder { color: #fff; }
+        .dir-menu-link i.fa-home { color: #93c5fd; }
+        .dir-toggle {
+            width: 1.25rem;
+            text-align: center;
+            font-size: 0.65rem;
+            color: var(--sidebar-muted);
+            flex-shrink: 0;
+        }
+        .dir-menu-empty {
+            padding: 0.75rem 1rem;
+            font-size: 0.85rem;
+            color: var(--sidebar-muted);
+        }
+
+        .main-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            padding: 1.25rem 1.5rem;
+        }
+        .main-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 1rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        .main-header h2 { font-size: 1.35rem; font-weight: 600; margin: 0; color: #0f172a; }
+        .root-hint { font-size: 0.8rem; color: #64748b; margin-top: 0.25rem; }
+        .toolbar {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .breadcrumb-container {
+            background: #fff;
+            padding: 12px 16px;
+            border-radius: 10px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            margin-bottom: 1rem;
+        }
+        .table-container {
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            flex: 1;
+        }
+        .file-row { cursor: pointer; transition: background 0.1s; }
+        .file-row:hover { background: #f8fafc; }
         .btn-sm-action { padding: 2px 8px; margin: 0 4px; }
-        .toolbar { margin-bottom: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
-        .current-root-badge { font-size: 0.85rem; background: #e9ecef; padding: 6px 12px; border-radius: 30px; }
-        i.icon-folder { color: #ffc107; }
-        i.icon-file { color: #6c757d; }
+        i.icon-folder { color: #f59e0b; }
+        i.icon-file { color: #64748b; }
         .loading { text-align: center; padding: 40px; }
-        .auth-area { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-        .auth-badge { font-size: 0.85rem; padding: 6px 12px; border-radius: 30px; }
-        .auth-badge.logged-in { background: #d1e7dd; color: #0f5132; }
-        .auth-badge.logged-out { background: #fff3cd; color: #664d03; }
+        .auth-area { display: flex; gap: 0.5rem; align-items: center; }
     </style>
 </head>
 <body>
-<div class="container-fluid">
-    <h2 class="mb-3"><i class="fas fa-folder-open me-2"></i>文件管理系统（代码与数据分离）</h2>
-    <!-- 修改点：显示根目录名称和绝对路径 -->
-    <div class="current-root-badge d-inline-block mb-3">
-        <i class="fas fa-database"></i> 业务数据根目录: <strong>{{ root_name }}</strong>
-        <span class="text-muted ms-2 small">(绝对路径: {{ root_path }})</span>
-        <br><small class="text-secondary">所有操作均限定在此目录内</small>
-    </div>
 
-    <!-- 工具栏 -->
-    <div class="toolbar">
-        <button class="btn btn-primary" id="btn-upload"><i class="fas fa-upload"></i> 上传文件</button>
-        <button class="btn btn-outline-success" id="btn-new-folder"><i class="fas fa-folder-plus"></i> 新建文件夹</button>
-        <button class="btn btn-outline-secondary" id="btn-refresh"><i class="fas fa-sync-alt"></i> 刷新</button>
-        <span class="text-muted" id="current-location"><i class="fas fa-location-dot"></i> 当前位置: /</span>
-        <div class="auth-area">
-            <span class="auth-badge logged-out" id="auth-badge"><i class="fas fa-user-lock"></i> 未登录</span>
-            <button class="btn btn-sm btn-outline-primary" id="btn-login"><i class="fas fa-sign-in-alt"></i> 登录</button>
-            <button class="btn btn-sm btn-outline-secondary d-none" id="btn-logout"><i class="fas fa-sign-out-alt"></i> 退出</button>
+<div class="app-shell visible" id="app-shell">
+    <aside class="sidebar">
+        <div class="sidebar-brand">
+            <a href="/" class="text-decoration-none text-white">
+                <h1><i class="fas fa-archive me-2"></i>{{ company_name }}</h1>
+            </a>
+            <small>文件归档系统</small>
         </div>
-    </div>
-
-    <!-- 面包屑导航 -->
-    <div class="breadcrumb-container">
-        <nav aria-label="breadcrumb">
-            <ol class="breadcrumb mb-0" id="breadcrumb">
-                <li class="breadcrumb-item active">根目录</li>
-            </ol>
+        <div class="sidebar-user">
+            <strong id="sidebar-username">—</strong>
+            <span id="sidebar-user-hint">已登录</span>
+        </div>
+        <div class="sidebar-nav-title">可访问目录</div>
+        <nav class="sidebar-nav">
+            <ul class="dir-menu" id="directory-menu"></ul>
         </nav>
-    </div>
+        <div class="p-3 border-top border-secondary border-opacity-25">
+            <button class="btn btn-outline-light btn-sm w-100" id="btn-logout">
+                <i class="fas fa-sign-out-alt me-1"></i> 退出登录
+            </button>
+        </div>
+    </aside>
 
-    <!-- 文件列表表格 -->
-    <div class="table-container">
-        <table class="table table-hover mb-0">
-            <thead class="table-light">
-                <tr>
-                    <th style="width: 45%">名称</th>
-                    <th style="width: 15%">大小</th>
-                    <th style="width: 25%">修改时间</th>
-                    <th style="width: 15%">操作</th>
-                </tr>
-            </thead>
-            <tbody id="file-list-body">
-                <tr class="loading-row"><td colspan="4" class="loading">加载中...</td></tr>
-            </tbody>
-        </table>
-    </div>
-</div>
+    <div class="main-panel">
+        <div class="main-header">
+            <div>
+                <h2><i class="fas fa-folder-open me-2 text-primary"></i><span id="page-title">文件列表</span></h2>
+                <div class="root-hint">数据根目录：{{ root_path }}</div>
+            </div>
+            <div class="auth-area d-none">
+                <span class="auth-badge logged-out" id="auth-badge"></span>
+                <button class="btn btn-sm btn-outline-primary d-none" id="btn-login">登录</button>
+            </div>
+        </div>
 
-<!-- 登录模态框 -->
-<div class="modal fade" id="loginModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="fas fa-sign-in-alt"></i> 登录</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted small">登录后才能上传文件，浏览和下载无需登录。</p>
-                <div class="mb-3">
-                    <label class="form-label">用户名</label>
-                    <input type="text" class="form-control" id="login-username" placeholder="请输入用户名" autocomplete="username">
-                </div>
-                <div class="mb-3">
-                    <label class="form-label">密码</label>
-                    <input type="password" class="form-control" id="login-password" placeholder="请输入密码" autocomplete="current-password">
-                </div>
-                <div class="text-danger small d-none" id="login-error"></div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                <button type="button" class="btn btn-primary" id="confirm-login">登录</button>
-            </div>
+        <div class="toolbar">
+            <button class="btn btn-primary btn-sm" id="btn-upload"><i class="fas fa-upload"></i> 上传</button>
+            <button class="btn btn-outline-success btn-sm" id="btn-new-folder"><i class="fas fa-folder-plus"></i> 新建文件夹</button>
+            <button class="btn btn-outline-secondary btn-sm" id="btn-refresh"><i class="fas fa-sync-alt"></i> 刷新</button>
+            <span class="text-muted small ms-2" id="current-location"></span>
+        </div>
+
+        <div class="breadcrumb-container">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-0" id="breadcrumb">
+                    <li class="breadcrumb-item active">根目录</li>
+                </ol>
+            </nav>
+        </div>
+
+        <div class="table-container">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:45%">名称</th>
+                        <th style="width:15%">大小</th>
+                        <th style="width:25%">修改时间</th>
+                        <th style="width:15%">操作</th>
+                    </tr>
+                </thead>
+                <tbody id="file-list-body">
+                    <tr><td colspan="4" class="loading">加载中...</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<!-- 上传文件模态框 -->
+<!-- 上传 / 新建 / 重命名 模态框 -->
 <div class="modal fade" id="uploadModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -116,7 +235,7 @@
             <div class="modal-body">
                 <form id="upload-form" enctype="multipart/form-data">
                     <div class="mb-3">
-                        <label class="form-label">选择文件（单个）</label>
+                        <label class="form-label">选择文件</label>
                         <input type="file" class="form-control" id="upload-file" name="file" required>
                     </div>
                     <input type="hidden" id="upload-path" name="path">
@@ -130,7 +249,6 @@
     </div>
 </div>
 
-<!-- 新建文件夹模态框 -->
 <div class="modal fade" id="mkdirModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -150,7 +268,6 @@
     </div>
 </div>
 
-<!-- 重命名模态框 -->
 <div class="modal fade" id="renameModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -160,7 +277,7 @@
             </div>
             <div class="modal-body">
                 <label class="form-label">新名称</label>
-                <input type="text" class="form-control" id="rename-new-name" placeholder="新名称">
+                <input type="text" class="form-control" id="rename-new-name">
                 <input type="hidden" id="rename-original-path">
             </div>
             <div class="modal-footer">
@@ -173,34 +290,131 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 <script>
-    let currentPath = "";
+    const DIR_LABELS = {
+        '': '全部文件',
+        'dept-hr': '人力资源部',
+        'dept-finance': '财务部',
+        'public': '公共目录'
+    };
+
+    let currentPath = '';
     let isLoggedIn = false;
+    let currentDirCanWrite = false;
+    let currentUsername = '';
+    let directoryMenu = [];
+
+    const appShell = document.getElementById('app-shell');
     const modalUpload = new bootstrap.Modal(document.getElementById('uploadModal'));
     const modalMkdir = new bootstrap.Modal(document.getElementById('mkdirModal'));
     const modalRename = new bootstrap.Modal(document.getElementById('renameModal'));
-    const modalLogin = new bootstrap.Modal(document.getElementById('loginModal'));
+
+    function redirectToLogin() {
+        window.location.href = '/?login=1';
+    }
+
+    function isMenuActive(itemPath, current) {
+        if (itemPath === current) return true;
+        if (itemPath && current.startsWith(itemPath + '/')) return true;
+        return false;
+    }
+
+    function dirLabel(path, fallbackName) {
+        if (path === '') return DIR_LABELS[''] || '全部文件';
+        const top = path.split('/')[0];
+        if (path === top && DIR_LABELS[top]) return DIR_LABELS[top];
+        return fallbackName || path.split('/').pop();
+    }
+
+    function showAppShell(show) {
+        appShell.classList.toggle('visible', show);
+    }
 
     function updateAuthUI(loggedIn, username) {
         isLoggedIn = loggedIn;
-        const badge = document.getElementById('auth-badge');
-        const btnLogin = document.getElementById('btn-login');
-        const btnLogout = document.getElementById('btn-logout');
         const btnUpload = document.getElementById('btn-upload');
-
+        const btnMkdir = document.getElementById('btn-new-folder');
         if (loggedIn) {
-            badge.className = 'auth-badge logged-in';
-            badge.innerHTML = `<i class="fas fa-user-check"></i> 已登录: ${escapeHtml(username || '')}`;
-            btnLogin.classList.add('d-none');
-            btnLogout.classList.remove('d-none');
-            btnUpload.disabled = false;
-            btnUpload.title = '';
+            document.getElementById('sidebar-username').textContent = username || '';
+            btnUpload.disabled = !currentDirCanWrite;
+            btnMkdir.disabled = !currentDirCanWrite;
         } else {
-            badge.className = 'auth-badge logged-out';
-            badge.innerHTML = '<i class="fas fa-user-lock"></i> 未登录';
-            btnLogin.classList.remove('d-none');
-            btnLogout.classList.add('d-none');
-            btnUpload.title = '请先登录后再上传';
+            btnUpload.disabled = true;
+            btnMkdir.disabled = true;
         }
+    }
+
+    function renderDirectoryMenu(menu, container) {
+        container.innerHTML = '';
+        if (!menu || !menu.length) {
+            container.innerHTML = '<li class="dir-menu-empty">暂无可用目录</li>';
+            return;
+        }
+
+        function buildItems(items, parentEl) {
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'dir-menu-item';
+                const hasChildren = item.children && item.children.length > 0;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'dir-menu-link' + (isMenuActive(item.path, currentPath) ? ' active' : '');
+                btn.dataset.path = item.path;
+
+                const toggle = document.createElement('span');
+                toggle.className = 'dir-toggle';
+                toggle.innerHTML = hasChildren
+                    ? '<i class="fas fa-chevron-down"></i>'
+                    : '';
+
+                const icon = document.createElement('i');
+                icon.className = item.path === '' ? 'fas fa-home' : 'fas fa-folder';
+
+                const label = document.createElement('span');
+                label.textContent = dirLabel(item.path, item.name);
+
+                btn.appendChild(toggle);
+                btn.appendChild(icon);
+                btn.appendChild(label);
+
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    navigateTo(item.path);
+                });
+
+                li.appendChild(btn);
+
+                if (hasChildren) {
+                    const sub = document.createElement('ul');
+                    buildItems(item.children, sub);
+                    li.appendChild(sub);
+                }
+                parentEl.appendChild(li);
+            });
+        }
+
+        buildItems(menu, container);
+    }
+
+    function syncSidebarActive() {
+        document.querySelectorAll('.dir-menu-link').forEach(link => {
+            link.classList.toggle('active', isMenuActive(link.dataset.path, currentPath));
+        });
+        const title = currentPath ? '/' + currentPath : '/';
+        document.getElementById('page-title').textContent = currentPath
+            ? dirLabel(currentPath.split('/')[0], currentPath.split('/').pop())
+            : '文件列表';
+    }
+
+    function navigateTo(path) {
+        currentPath = path;
+        syncSidebarActive();
+        refreshFileList();
+    }
+
+    function updateDirectoryMenu(menu) {
+        directoryMenu = menu || [];
+        renderDirectoryMenu(directoryMenu, document.getElementById('directory-menu'));
+        syncSidebarActive();
     }
 
     function checkAuthStatus() {
@@ -208,53 +422,18 @@
             .then(res => res.json())
             .then(data => {
                 updateAuthUI(data.logged_in, data.username);
+                if (data.logged_in) {
+                    currentUsername = data.username || '';
+                    updateDirectoryMenu(data.directory_menu);
+                }
                 return data;
             })
-            .catch(() => updateAuthUI(false));
-    }
-
-    function showLoginModal(message) {
-        const errorEl = document.getElementById('login-error');
-        if (message) {
-            errorEl.textContent = message;
-            errorEl.classList.remove('d-none');
-        } else {
-            errorEl.textContent = '';
-            errorEl.classList.add('d-none');
-        }
-        modalLogin.show();
-    }
-
-    function login() {
-        const username = document.getElementById('login-username').value.trim();
-        const password = document.getElementById('login-password').value;
-        if (!username || !password) {
-            showLoginModal('请输入用户名和密码');
-            return;
-        }
-        fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        })
-        .then(res => res.json().then(data => ({ ok: res.ok, data })))
-        .then(({ ok, data }) => {
-            if (!ok) {
-                showLoginModal(data.error || '登录失败');
-                return;
-            }
-            updateAuthUI(true, data.username);
-            modalLogin.hide();
-            document.getElementById('login-password').value = '';
-            document.getElementById('login-error').classList.add('d-none');
-        })
-        .catch(err => showLoginModal(`请求错误: ${err.message}`));
+            .catch(() => redirectToLogin());
     }
 
     function logout() {
         fetch('/api/logout', { method: 'POST' })
-            .then(() => updateAuthUI(false))
-            .catch(err => alert(`退出失败: ${err.message}`));
+            .then(() => { window.location.href = '/'; });
     }
 
     function getListApiPath() {
@@ -264,16 +443,27 @@
     function refreshFileList() {
         const tbody = document.getElementById('file-list-body');
         tbody.innerHTML = '<tr><td colspan="4" class="loading"><i class="fas fa-spinner fa-spin"></i> 加载中...</td></tr>';
+        if (!isLoggedIn) return;
+
         fetch(`/api/list${getListApiPath()}`)
-            .then(res => res.json())
-            .then(data => {
-                if (data.error) {
-                    tbody.innerHTML = `<tr><td colspan="4" class="text-danger text-center">错误: ${data.error}</td></tr>`;
+            .then(res => res.json().then(data => ({ status: res.status, data })))
+            .then(({ status, data }) => {
+                if (status === 401) {
+                    redirectToLogin();
                     return;
                 }
+                if (status === 403 || data.error) {
+                    tbody.innerHTML = `<tr><td colspan="4" class="text-danger text-center">${escapeHtml(data.error || '无权访问')}</td></tr>`;
+                    return;
+                }
+                currentDirCanWrite = !!(data.current_permissions && data.current_permissions.can_write);
+                updateAuthUI(true, currentUsername);
+                if (data.directory_menu) updateDirectoryMenu(data.directory_menu);
                 renderFileList(data.items);
-                updateBreadcrumb(data.current_path, data.parent_path);
-                document.getElementById('current-location').innerHTML = `<i class="fas fa-location-dot"></i> 当前位置: /${data.current_path || ''}`;
+                updateBreadcrumb(data.current_path);
+                syncSidebarActive();
+                document.getElementById('current-location').innerHTML =
+                    `<i class="fas fa-location-dot"></i> /${data.current_path || ''}`;
             })
             .catch(err => {
                 tbody.innerHTML = `<tr><td colspan="4" class="text-danger text-center">请求失败: ${err.message}</td></tr>`;
@@ -282,66 +472,53 @@
 
     function renderFileList(items) {
         const tbody = document.getElementById('file-list-body');
-        if (!items.length) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">此文件夹为空</td></tr>';
+        if (!items || !items.length) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-4">此文件夹为空</td></tr>';
             return;
         }
         let html = '';
         items.forEach(item => {
-            const icon = item.type === 'dir' ? '<i class="fas fa-folder icon-folder fa-lg me-2"></i>' : '<i class="fas fa-file icon-file fa-lg me-2"></i>';
-            const actionButtons = `
-                <button class="btn btn-sm btn-outline-secondary btn-sm-action rename-btn" data-path="${item.relative_path}" data-name="${item.name}" data-type="${item.type}"><i class="fas fa-edit"></i></button>
-                <button class="btn btn-sm btn-outline-danger btn-sm-action delete-btn" data-path="${item.relative_path}" data-name="${item.name}"><i class="fas fa-trash-alt"></i></button>
-            `;
-            html += `
-                <tr class="file-row" data-path="${item.relative_path}" data-type="${item.type}">
-                    <td>${icon} <span>${escapeHtml(item.name)}</span></td>
-                    <td>${item.size}</td>
-                    <td>${item.modified}</td>
-                    <td>${actionButtons}</td>
-                </tr>
-            `;
+            const icon = item.type === 'dir'
+                ? '<i class="fas fa-folder icon-folder fa-lg me-2"></i>'
+                : '<i class="fas fa-file icon-file fa-lg me-2"></i>';
+            let actionButtons = '<span class="text-muted small">—</span>';
+            if (item.can_write) {
+                actionButtons = `<button class="btn btn-sm btn-outline-secondary btn-sm-action rename-btn" data-path="${item.relative_path}" data-name="${item.name}"><i class="fas fa-edit"></i></button>`;
+            }
+            if (item.can_delete) {
+                actionButtons += `<button class="btn btn-sm btn-outline-danger btn-sm-action delete-btn" data-path="${item.relative_path}" data-name="${item.name}"><i class="fas fa-trash-alt"></i></button>`;
+            }
+            html += `<tr class="file-row" data-path="${item.relative_path}" data-type="${item.type}">
+                <td>${icon}<span>${escapeHtml(item.name)}</span></td>
+                <td>${item.size}</td><td>${item.modified}</td><td>${actionButtons}</td></tr>`;
         });
         tbody.innerHTML = html;
 
         document.querySelectorAll('#file-list-body .file-row').forEach(row => {
-            const relPath = row.getAttribute('data-path');
-            const type = row.getAttribute('data-type');
             row.addEventListener('click', (e) => {
                 if (e.target.closest('.rename-btn') || e.target.closest('.delete-btn')) return;
-                if (type === 'dir') {
-                    currentPath = relPath;
-                    refreshFileList();
-                } else {
-                    downloadFile(relPath);
-                }
+                const relPath = row.getAttribute('data-path');
+                if (row.getAttribute('data-type') === 'dir') navigateTo(relPath);
+                else downloadFile(relPath);
             });
         });
-
         document.querySelectorAll('.rename-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const path = btn.getAttribute('data-path');
-                const oldName = btn.getAttribute('data-name');
-                document.getElementById('rename-original-path').value = path;
-                document.getElementById('rename-new-name').value = oldName;
+                document.getElementById('rename-original-path').value = btn.dataset.path;
+                document.getElementById('rename-new-name').value = btn.dataset.name;
                 modalRename.show();
             });
         });
-
         document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const path = btn.getAttribute('data-path');
-                const name = btn.getAttribute('data-name');
-                if (confirm(`确定要删除 "${name}" 吗？删除后无法恢复。`)) {
-                    deleteItem(path);
-                }
+                if (confirm(`确定删除 "${btn.dataset.name}" 吗？`)) deleteItem(btn.dataset.path);
             });
         });
     }
 
-    function updateBreadcrumb(current, parentPath) {
+    function updateBreadcrumb(current) {
         const breadcrumb = document.getElementById('breadcrumb');
         const parts = current ? current.split('/') : [];
         let html = `<li class="breadcrumb-item"><a href="#" data-path="" class="breadcrumb-link">根目录</a></li>`;
@@ -351,17 +528,15 @@
             html += `<li class="breadcrumb-item"><a href="#" data-path="${cumulative}" class="breadcrumb-link">${escapeHtml(parts[i])}</a></li>`;
         }
         if (!current) {
-            html = `<li class="breadcrumb-item active">根目录</li>`;
+            html = '<li class="breadcrumb-item active">根目录</li>';
         } else {
-            html += `<li class="breadcrumb-item active">${escapeHtml(parts[parts.length-1])}</li>`;
+            html += `<li class="breadcrumb-item active">${escapeHtml(parts[parts.length - 1])}</li>`;
         }
         breadcrumb.innerHTML = html;
         document.querySelectorAll('.breadcrumb-link').forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                const targetPath = link.getAttribute('data-path');
-                currentPath = targetPath;
-                refreshFileList();
+                navigateTo(link.getAttribute('data-path'));
             });
         });
     }
@@ -380,63 +555,35 @@
         .then(data => {
             if (data.error) alert(`删除失败: ${data.error}`);
             else refreshFileList();
-        })
-        .catch(err => alert(`请求错误: ${err.message}`));
+        });
     }
 
     document.getElementById('confirm-upload').addEventListener('click', () => {
         const fileInput = document.getElementById('upload-file');
         const file = fileInput.files[0];
-        if (!file) {
-            alert('请选择文件');
-            return;
-        }
+        if (!file) { alert('请选择文件'); return; }
         const formData = new FormData();
         formData.append('file', file);
         formData.append('path', currentPath);
-        fetch('/api/upload', {
-            method: 'POST',
-            body: formData
-        })
+        fetch('/api/upload', { method: 'POST', body: formData })
         .then(res => res.json().then(data => ({ status: res.status, data })))
         .then(({ status, data }) => {
-            if (status === 401) {
-                showLoginModal(data.error || '请先登录');
-                return;
-            }
+            if (status === 401) { redirectToLogin(); return; }
             if (data.error) alert(`上传失败: ${data.error}`);
-            else {
-                alert('上传成功');
-                modalUpload.hide();
-                fileInput.value = '';
-                refreshFileList();
-            }
-        })
-        .catch(err => alert(`上传错误: ${err.message}`));
+            else { modalUpload.hide(); fileInput.value = ''; refreshFileList(); }
+        });
     });
 
     document.getElementById('btn-upload').addEventListener('click', () => {
-        if (!isLoggedIn) {
-            showLoginModal('上传文件需要先登录');
-            return;
-        }
         document.getElementById('upload-path').value = currentPath;
         modalUpload.show();
     });
 
-    document.getElementById('btn-login').addEventListener('click', () => showLoginModal());
     document.getElementById('btn-logout').addEventListener('click', logout);
-    document.getElementById('confirm-login').addEventListener('click', login);
-    document.getElementById('login-password').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') login();
-    });
 
     document.getElementById('confirm-mkdir').addEventListener('click', () => {
         const newName = document.getElementById('new-folder-name').value.trim();
-        if (!newName) {
-            alert('请输入文件夹名称');
-            return;
-        }
+        if (!newName) { alert('请输入文件夹名称'); return; }
         fetch('/api/mkdir', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -445,27 +592,16 @@
         .then(res => res.json())
         .then(data => {
             if (data.error) alert(`创建失败: ${data.error}`);
-            else {
-                alert('创建成功');
-                modalMkdir.hide();
-                document.getElementById('new-folder-name').value = '';
-                refreshFileList();
-            }
-        })
-        .catch(err => alert(`请求错误: ${err.message}`));
+            else { modalMkdir.hide(); document.getElementById('new-folder-name').value = ''; refreshFileList(); }
+        });
     });
 
-    document.getElementById('btn-new-folder').addEventListener('click', () => {
-        modalMkdir.show();
-    });
+    document.getElementById('btn-new-folder').addEventListener('click', () => modalMkdir.show());
 
     document.getElementById('confirm-rename').addEventListener('click', () => {
         const originalPath = document.getElementById('rename-original-path').value;
         const newName = document.getElementById('rename-new-name').value.trim();
-        if (!newName) {
-            alert('新名称不能为空');
-            return;
-        }
+        if (!newName) { alert('新名称不能为空'); return; }
         fetch('/api/rename', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -474,29 +610,24 @@
         .then(res => res.json())
         .then(data => {
             if (data.error) alert(`重命名失败: ${data.error}`);
-            else {
-                alert('重命名成功');
-                modalRename.hide();
-                refreshFileList();
-            }
-        })
-        .catch(err => alert(`错误: ${err.message}`));
+            else { modalRename.hide(); refreshFileList(); }
+        });
     });
 
-    document.getElementById('btn-refresh').addEventListener('click', () => {
-        refreshFileList();
-    });
+    document.getElementById('btn-refresh').addEventListener('click', refreshFileList);
 
     function escapeHtml(str) {
-        return str.replace(/[&<>]/g, function(m) {
-            if (m === '&') return '&amp;';
-            if (m === '<') return '&lt;';
-            if (m === '>') return '&gt;';
-            return m;
-        });
+        return String(str).replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
     }
 
-    checkAuthStatus().then(() => refreshFileList());
+    checkAuthStatus().then(data => {
+        if (data && data.logged_in) {
+            currentPath = (data.directory_menu && data.directory_menu[0]) ? data.directory_menu[0].path : '';
+            refreshFileList();
+        } else {
+            redirectToLogin();
+        }
+    });
 </script>
 </body>
 </html>
